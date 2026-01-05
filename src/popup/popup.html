@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8">
     <style>
+
+        @font-face {
+        font-family: 'TableFont';
+        src: url('./assets/SVN-Segoe UI.ttf'); 
+        }
         body {
             width: 300px;
             padding: 20px;
@@ -48,15 +53,26 @@
             background-color: #da190b;
         }
         
-        #postApiBtn {
-            background-color: #9C27B0;
+        #downloadBtn {
+            background-color: #4CAF50;
             color: white;
             width: 100%;
             margin-top: 10px;
         }
         
-        #postApiBtn:hover {
-            background-color: #7B1FA2;
+        #downloadBtn:hover {
+            background-color: #45a049;
+        }
+        
+        #showBtn {
+            background-color: #2196F3;
+            color: white;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        #showBtn:hover {
+            background-color: #0b7dda;
         }
         
         .info {
@@ -71,14 +87,13 @@
 </head>
 <body>
     <h3>Thời Khóa Biểu</h3>
-    <h5>Chọn bảng dữ liệu thời khóa biểu</h5>
-    <select id="tableSelect">
-        <option value="">Chọn một table...</option>
-    </select>
+    <div id="tableStatus" style="padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; font-weight: bold; font-size: large"></div>
     
-    <button id="clearBtn">Xóa tất cả</button>
-    <button id="postApiBtn">Tạo thời khóa biểu</button>
+    <button id="downloadBtn">Tải ảnh</button>
+    <button id="showBtn">Hiển thị ảnh</button>
     
+    <script src="/src/lib/generator.js"></script>
     <script src="popup.js"></script>
+    <img id="result-image" style="margin-top: 15px; width: 100%; border: 1px solid #ddd; border-radius: 4px; display: none;">
 </body>
 </html>

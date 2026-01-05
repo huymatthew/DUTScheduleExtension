@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const tableSelect = document.getElementById('tableSelect');
-    const clearBtn = document.getElementById('clearBtn');
-    const postApiBtn = document.getElementById('postApiBtn');
+    const tableStatus = document.getElementById('tableStatus');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const showBtn = document.getElementById('showBtn');
+    let foundTable = null;
 
     async function getCurrentTab() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -14,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await chrome.tabs.sendMessage(tab.id, { action: 'scanTables' });
             
             if (response && response.tables) {
-                populateTableSelect(response.tables);
+                updateTableStatus(response.tables);
             }
         } catch (error) {
             console.error('Error refreshing tables:', error);
@@ -31,59 +32,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function populateTableSelect(tables) {
-        tableSelect.innerHTML = '<option value="">Chọn một table...</option>';
-        
-        tables.forEach((table, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = `Table ${index + 1} (${table.rows}x${table.cols}) - ${table.preview}`;
-            tableSelect.appendChild(option);
-        });
-    }
-
-    async function onTableSelectChange() {
-        const selectedIndex = tableSelect.value;
-        
-        try {
-            const tab = await getCurrentTab();
-            await chrome.tabs.sendMessage(tab.id, { action: 'clearHighlights' });
+    async function updateTableStatus(tables) {
+        if (tables && tables.length > 0) {
+            foundTable = tables[0];
+            tableStatus.textContent = 'Đã tìm thấy thời khóa biểu!';
+            tableStatus.style.color = '#4CAF50';
+            downloadBtn.disabled = false;
+            showBtn.disabled = false;
             
-            if (selectedIndex !== '') {
+            // Auto-highlight the found table
+            try {
+                const tab = await getCurrentTab();
                 await chrome.tabs.sendMessage(tab.id, { 
                     action: 'highlightTable', 
-                    index: parseInt(selectedIndex) 
+                    index: 0
                 });
+            } catch (error) {
+                console.error('Error auto-highlighting table:', error);
             }
-        } catch (error) {
-            console.error('Error auto-highlighting table:', error);
+        } else {
+            foundTable = null;
+            tableStatus.textContent = 'Không tìm thấy thời khóa biểu!';
+            tableStatus.style.color = '#f44336';
+            downloadBtn.disabled = true;
+            showBtn.disabled = true;
         }
     }
 
-    async function clearAllHighlights() {
-        try {
-            const tab = await getCurrentTab();
-            await chrome.tabs.sendMessage(tab.id, { action: 'clearHighlights' });
-        } catch (error) {
-            console.error('Error clearing highlights:', error);
-        }
-    }
 
-    async function handlePostToAPI() {
-        const selectedIndex = tableSelect.value;
-        if (selectedIndex === '') {
-            alert('Vui lòng chọn một table trước!');
+
+    async function handleDownloadImage() {
+        if (!foundTable) {
+            alert('Không tìm thấy table phù hợp!');
             return;
         }
-
-        const apiUrl = 'http://huyskyzz.pythonanywhere.com/api/tkb_download/';
 
         try {
             const tab = await getCurrentTab();
             
             const tableResponse = await chrome.tabs.sendMessage(tab.id, { 
                 action: 'convertToJSON', 
-                index: parseInt(selectedIndex) 
+                index: 0
             });
             
             if (!tableResponse || !tableResponse.success) {
@@ -91,76 +80,97 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            postApiBtn.textContent = 'Đang tạo...';
-            postApiBtn.disabled = true;
+            downloadBtn.textContent = 'Đang tạo...';
+            downloadBtn.disabled = true;
+            showBtn.disabled = true;
             
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'image/*, application/json'
-                },
-                body: JSON.stringify({
-                    data: tableResponse.json
-                })
+            const bgPath = "./assets/tbk.png";
+
+            generateScheduleImage(tableResponse.json, bgPath).then(base64Str => {
+                console.log("Đã tạo xong ảnh!");
+                const link = document.createElement('a');
+                link.download = 'ThoiKhoaBieu.png';
+                link.href = base64Str;
+                link.click();
+                
+                downloadBtn.textContent = 'Download Image';
+                downloadBtn.disabled = false;
+                showBtn.disabled = false;
             });
 
             await chrome.tabs.sendMessage(tab.id, { action: 'clearHighlights' });
-
-            postApiBtn.textContent = 'Tạo thời khóa biểu';
-            postApiBtn.disabled = false;
-
-            if (response.ok) {
-                const contentType = response.headers.get('content-type') || '';
-                
-                if (contentType.includes('image/')) {
-                    const imageBlob = await response.blob();
-                    const imageUrl = URL.createObjectURL(imageBlob);
-                    
-                    const contentDisposition = response.headers.get('content-disposition') || '';
-                    let fileName = 'tbk.png';
-                    
-                    const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
-                    if (filenameMatch) {
-                        fileName = filenameMatch[1];
-                    }
-                    
-                    chrome.tabs.create({ url: imageUrl });
-                    setTimeout(() => URL.revokeObjectURL(imageUrl), 10000);
-                    
-                    alert(`✅ POST thành công!\n\nStatus: ${response.status}\nImage size: ${(imageBlob.size / 1024).toFixed(2)} KB\nContent Type: ${contentType}\nFilename: ${fileName}\n\nẢnh đã được mở trong tab mới!`);
-                    console.log('Image opened in new tab:', fileName, 'Size:', imageBlob.size, 'bytes');
-                    
-                } else {
-                    try {
-                        const errorData = await response.json();
-                        throw new Error(`Server error: ${errorData.message || 'Unknown error'}`);
-                    } catch (parseError) {
-                        const textResponse = await response.text();
-                        throw new Error(`Server error: ${textResponse || 'Unknown error'}`);
-                    }
-                }
-            } else {
-                try {
-                    const errorData = await response.json();
-                    throw new Error(`HTTP ${response.status}: ${errorData.message || response.statusText}`);
-                } catch (parseError) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-            }
                 
         } catch (error) {
-            postApiBtn.textContent = 'Tạo thời khóa biểu';
-            postApiBtn.disabled = false;
+            downloadBtn.textContent = 'Download Image';
+            downloadBtn.disabled = false;
+            showBtn.disabled = false;
             
-            console.error('Error posting to API:', error);
-            alert('❌ Lỗi khi POST API:\n' + error.message + '\n\nKiểm tra:\n- URL có đúng không?\n- API có hỗ trợ CORS không?\n- Network connection');
+            console.error('Error generating image:', error);
+            alert('❌ Lỗi khi tạo ảnh:\n' + error.message);
         }
     }
 
-    tableSelect.addEventListener('change', onTableSelectChange);
-    clearBtn.addEventListener('click', clearAllHighlights);
-    postApiBtn.addEventListener('click', handlePostToAPI);
+    async function handleShowImage() {
+        if (!foundTable) {
+            alert('Không tìm thấy table phù hợp!');
+            return;
+        }
+
+        try {
+            const tab = await getCurrentTab();
+            
+            const tableResponse = await chrome.tabs.sendMessage(tab.id, { 
+                action: 'convertToJSON', 
+                index: 0
+            });
+            
+            if (!tableResponse || !tableResponse.success) {
+                alert('❌ Không thể lấy data từ table!');
+                return;
+            }
+            
+            showBtn.textContent = 'Đang tạo...';
+            showBtn.disabled = true;
+            downloadBtn.disabled = true;
+            
+            const bgPath = "./assets/tbk.png";
+
+            generateScheduleImage(tableResponse.json, bgPath).then(base64Str => {
+                console.log("Đã tạo xong ảnh!");
+                
+                // Convert base64 to blob
+                const byteString = atob(base64Str.split(',')[1]);
+                const mimeString = base64Str.split(',')[0].split(':')[1].split(';')[0];
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                const blob = new Blob([ab], { type: mimeString });
+                const blobUrl = URL.createObjectURL(blob);
+                
+                // Open in new tab
+                chrome.tabs.create({ url: blobUrl });
+                
+                showBtn.textContent = 'Show Image';
+                showBtn.disabled = false;
+                downloadBtn.disabled = false;
+            });
+
+            await chrome.tabs.sendMessage(tab.id, { action: 'clearHighlights' });
+                
+        } catch (error) {
+            showBtn.textContent = 'Show Image';
+            showBtn.disabled = false;
+            downloadBtn.disabled = false;
+            
+            console.error('Error generating image:', error);
+            alert('❌ Lỗi khi tạo ảnh:\n' + error.message);
+        }
+    }
+
+    downloadBtn.addEventListener('click', handleDownloadImage);
+    showBtn.addEventListener('click', handleShowImage);
 
     window.addEventListener('beforeunload', async () => {
         try {

@@ -8,7 +8,9 @@ MINTABLE_WIDTH = 7;
         const allTables = document.querySelectorAll('table');
         tables = [];
 
-        allTables.forEach((table, index) => {
+        // Find only the first table with cols >= 7
+        for (let index = 0; index < allTables.length; index++) {
+            const table = allTables[index];
             const rows = table.rows.length;
             let maxCols = 0;
             
@@ -16,7 +18,7 @@ MINTABLE_WIDTH = 7;
                 maxCols = Math.max(maxCols, table.rows[i].cells.length);
             }
 
-            if (maxCols < 7) return;
+            if (maxCols < 7) continue;
 
             let preview = '';
             if (table.caption) {
@@ -32,7 +34,7 @@ MINTABLE_WIDTH = 7;
             }
             
             if (!preview) {
-                preview = `Table ${tables.length + 1}`;
+                preview = `Table 1`;
             }
 
             tables.push({
@@ -40,11 +42,14 @@ MINTABLE_WIDTH = 7;
                 rows: rows,
                 cols: maxCols,
                 preview: preview,
-                index: tables.length
+                index: 0
             });
 
-            table.setAttribute('data-table-highlighter-index', tables.length - 1);
-        });
+            table.setAttribute('data-table-highlighter-index', 0);
+            
+            // Only get the first matching table
+            break;
+        }
 
         return tables.map(t => ({
             rows: t.rows,

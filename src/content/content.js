@@ -163,24 +163,6 @@ MINTABLE_WIDTH = 7;
         }
     }
 
-    function handleExtraFeature(index) {
-        const table = tables[index];
-        if (!table) return;
-
-        console.log('Extra feature called for table:', index);
-        console.log('Table info:', {
-            rows: table.rows,
-            cols: table.cols,
-            preview: table.preview
-        });
-        
-        table.element.style.outline = '2px dashed #FF9800';
-        
-        setTimeout(() => {
-            table.element.style.outline = '';
-        }, 3000);
-    }
-
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         switch (request.action) {
             case 'scanTables':
@@ -201,11 +183,6 @@ MINTABLE_WIDTH = 7;
             case 'convertToJSON':
                 const jsonResult = convertTableToJSON(request.index);
                 sendResponse(jsonResult);
-                break;
-                
-            case 'extraFeature':
-                handleExtraFeature(request.index);
-                sendResponse({ success: true });
                 break;
         }
         return true;

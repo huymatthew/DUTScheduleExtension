@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DUT Schedule Generator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Extract table data and generate schedule images",
   "permissions": [
     "activeTab",

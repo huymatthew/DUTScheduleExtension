@@ -111,6 +111,7 @@ function drawTextWithMaxWidth(ctx, text, x, y, maxWidth, lineHeight) {
         }
     }
     ctx.fillText(line, x + 20, currentY);
+    return currentY + lineHeight;
 }
 
 async function generateScheduleImage(jsonData, bgImageUrl) {
@@ -130,7 +131,7 @@ async function generateScheduleImage(jsonData, bgImageUrl) {
 
     ctx.drawImage(bgImage, 0, 0);
 
-    ctx.font = "40px 'TableFont', 'Arial', sans-serif"; 
+    ctx.font = "40px 'TableFont', 'Arial', sans-serif"; // 38-44px
     ctx.textBaseline = "top";
 
     const startX = 513;
@@ -150,6 +151,7 @@ async function generateScheduleImage(jsonData, bgImageUrl) {
         const day = course.schedule.day;
         const start = course.schedule.startPeriod;
         const end = course.schedule.endPeriod;
+        const textHeight = ctx.measureText(course.courseName).actualBoundingBoxAscent + ctx.measureText(course.courseName).actualBoundingBoxDescent;
 
         const x = startX + (day - 2) * cellWidth;
         const y = startY + (start - 1) * cellHeight;
@@ -164,15 +166,17 @@ async function generateScheduleImage(jsonData, bgImageUrl) {
         ctx.strokeRect(x, y, cellWidth, boxHeight);
 
         ctx.fillStyle = "black";
-        const textContent = `${course.courseName} \n - ${course.room}`;
-        
-        const lines = textContent.split('\n');
+
         let textY = y + 25;
         
-        lines.forEach(lineStr => {
-             drawTextWithMaxWidth(ctx, lineStr.trim(), x, textY, maxWidth, 45);
-             textY += 50 * Math.ceil(ctx.measureText(lineStr).width / maxWidth); 
-        });
+        let subjectTextHeight = drawTextWithMaxWidth(ctx, course.courseName.trim(), x, textY, maxWidth, textHeight + 15);
+             textY += 50 * Math.ceil(ctx.measureText(course.courseName).width / maxWidth);
+
+        let roomTextHeight = drawTextWithMaxWidth(ctx, `- ${course.room.trim()}`, x, subjectTextHeight, maxWidth, textHeight + 15);
+        if (false) // Always show teacher @theme
+        {
+            drawTextWithMaxWidth(ctx, `${course.teacher.trim()}`, x, roomTextHeight + 15, maxWidth, textHeight + 10);
+        }
 
         colorIndex++;
     });

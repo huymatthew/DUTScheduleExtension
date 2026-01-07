@@ -57,9 +57,9 @@ function parseJsonData(jsonData) {
     
     let typeKeys;
     if (data.length > 0 && 'Column_7' in data[0] && 'Column_8' in data[0]) {
-        typeKeys = ["Thông tin lớp học phần", "Khảo sát ý kiến cuối học kỳ" ,'Column_7', 'Column_8'];
+        typeKeys = ["Thông tin lớp học phần", "Khảo sát ý kiến cuối học kỳ" ,'Column_7', 'Column_8', 'Column_9'];
     } else {
-        typeKeys = ['Mã lớp học phần', 'Tên lớp học phần', 'Giảng viên', 'Thời khóa biểu'];
+        typeKeys = ['Mã lớp học phần', 'Tên lớp học phần', 'Giảng viên', 'Thời khóa biểu', 'Tuần học'];
     }
 
     data.forEach(item => {
@@ -69,6 +69,7 @@ function parseJsonData(jsonData) {
         const courseName = item[typeKeys[1]] || "";
         const teacher = item[typeKeys[2]] || "";
         const scheduleStr = item[typeKeys[3]] || "";
+        const weekInfo = item[typeKeys[4]] || "";
 
         const scheduleList = parseSchedule(scheduleStr);
         if (scheduleList.length === 0) return;
@@ -84,7 +85,8 @@ function parseJsonData(jsonData) {
                 teacher,
                 room: sched.room,
                 schedule: sched,
-                sessionIndex: i
+                sessionIndex: i,
+                weekInfo
             };
         });
     });
@@ -114,7 +116,7 @@ function drawTextWithMaxWidth(ctx, text, x, y, maxWidth, lineHeight) {
     return currentY + lineHeight;
 }
 
-async function generateScheduleImage(jsonData, bgImageUrl) {
+async function generateScheduleImage(jsonData, bgImageUrl, weekNumber = null) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -141,11 +143,21 @@ async function generateScheduleImage(jsonData, bgImageUrl) {
     const maxWidth = 340;
     
     const parsedCourses = parseJsonData(jsonData);
+
     const colorList = [...COLORS];
 
     let colorIndex = 0;
 
-    Object.values(parsedCourses).forEach(course => {
+    var courseList = Object.values(parsedCourses).filter(course => {
+        if (weekNumber !== null && weekNumber !== undefined && weekNumber !== '') {
+            if (!weekChecker(course.weekInfo, weekNumber)) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    courseList.forEach(course => {
         const color = colorList[colorIndex % colorList.length];
         
         const day = course.schedule.day;
@@ -180,6 +192,91 @@ async function generateScheduleImage(jsonData, bgImageUrl) {
 
         colorIndex++;
     });
+    // Conflicts
+    const conflicts = checkGridConflicts(courseList);
+    conflicts.forEach(conflict => {
+        const day = conflict.day;
+        const start = conflict.conflictStart;
+        const end = conflict.conflictEnd;
+
+        const x = startX + (day - 2) * cellWidth;
+        const y = startY + (start - 1) * cellHeight;
+        const boxHeight = (end - start + 1) * cellHeight;
+
+        drawRedLineRect(ctx, x, y, cellWidth, boxHeight, 30);
+    });
 
     return canvas.toDataURL("image/png");
+}
+
+function checkGridConflicts(courseList) {
+    let conflicts = [];
+    console.log("Checking grid conflicts for courses:", courseList);
+
+    for (let i = 0; i < courseList.length; i++) {
+        for (let j = i + 1; j < courseList.length; j++) {
+            const m1 = courseList[i];
+            const m2 = courseList[j];
+
+            if (m1.schedule.day === m2.schedule.day) {
+                const isPeriodOverlap = Math.max(m1.schedule.startPeriod, m2.schedule.startPeriod) 
+                                      <= Math.min(m1.schedule.endPeriod, m2.schedule.endPeriod);
+
+                if (isPeriodOverlap) {
+                    conflicts.push({
+                        subjects: [m1.courseName, m2.courseName],
+                        codes: [m1.courseCode, m2.courseCode],
+                        day: m1.schedule.day,
+                        conflictStart: Math.max(m1.schedule.startPeriod, m2.schedule.startPeriod),
+                        conflictEnd: Math.min(m1.schedule.endPeriod, m2.schedule.endPeriod)
+                    });
+                }
+            }
+        }
+    }
+    return conflicts;
+}
+function drawRedLineRect(ctx, x, y, width, height, space = 20) {
+    ctx.save(); 
+
+    ctx.beginPath();
+    ctx.rect(x, y, width, height);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; 
+    ctx.lineWidth = 3;
+
+    for (let i = -height; i < width; i += space) {
+        ctx.beginPath();
+        ctx.moveTo(x + i, y);
+        ctx.lineTo(x + i + height, y + height);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function weekChecker(weekInfo /*1-15;17-17*/, weekNumber /*16*/) {
+    if (!weekInfo || !weekInfo.trim()) return undefined;
+
+    const ranges = weekInfo.split(';').map(part => part.trim());
+
+    for (let range of ranges) {
+        if (range.includes('-')) {
+            const [startStr, endStr] = range.split('-').map(s => s.trim());
+            const start = parseInt(startStr);
+            const end = parseInt(endStr);
+
+            if (weekNumber >= start && weekNumber <= end) {
+                return true;
+            }
+        } else {
+            const week = parseInt(range);
+            if (weekNumber === week) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

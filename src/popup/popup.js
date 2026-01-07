@@ -1,7 +1,15 @@
+function toggleWeekInput(isChecked) {
+    const weekInput = document.getElementById('weekNumber');
+    weekInput.disabled = !isChecked;
+    if (!isChecked) {
+        weekInput.value = '';
+    }
+}
 document.addEventListener('DOMContentLoaded', function() {
     const tableStatus = document.getElementById('tableStatus');
     const downloadBtn = document.getElementById('downloadBtn');
     const showBtn = document.getElementById('showBtn');
+    const weekInput = document.getElementById('weekNumber');
     let foundTable = null;
 
     async function getCurrentTab() {
@@ -86,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const bgPath = "./assets/tbk.png";
 
-            generateScheduleImage(tableResponse.json, bgPath).then(base64Str => {
+            generateScheduleImage(tableResponse.json, bgPath, weekInput.value).then(base64Str => {
                 console.log("Đã tạo xong ảnh!");
                 const link = document.createElement('a');
                 link.download = 'ThoiKhoaBieu.png';
@@ -135,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const bgPath = "./assets/tbk.png";
 
-            generateScheduleImage(tableResponse.json, bgPath).then(base64Str => {
+            generateScheduleImage(tableResponse.json, bgPath, weekInput.value).then(base64Str => {
                 console.log("Đã tạo xong ảnh!");
                 
                 // Convert base64 to blob
@@ -192,5 +200,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    const weekCheckbox = document.getElementById('weekCheckbox');
+    weekCheckbox.addEventListener('change', (event) => {
+        toggleWeekInput(event.target.checked);
+    });
+
     refreshTables();
 });
+
+
